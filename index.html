@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seenenimed</title>
+    <style>
+        body { font-family: sans-serif; }
+        #results { margin-top: 20px; border: 1px solid #ccc; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Leia seenenimed</h1>
+    <form id="nameForm">
+        <label for="latinName">Ladinakeelne nimi:</label><br>
+        <input type="text" id="latinName" name="latinName" size="40"><br><br>
+        <button type="submit">Otsi</button>
+    </form>
+
+    <div id="results" style="display: none;">
+        <h2>Nimed:</h2>
+        <p>🇪🇪 Eesti nimi: <span id="etName"></span></p>
+        <p>🇫🇮 Soome nimi: <span id="fiName"></span></p>
+        <p>🇸🇪 Rootsi nimi: <span id="svName"></span></p>
+        <p>🇬🇧 Inglise nimi: <span id="enName"></span></p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('nameForm');
+            const resultsDiv = document.getElementById('results');
+            const etNameSpan = document.getElementById('etName');
+            const fiNameSpan = document.getElementById('fiName');
+            const svNameSpan = document.getElementById('svName');
+            const enNameSpan = document.getElementById('enName');
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const latinName = document.getElementById('latinName').value.trim();
+
+                if (latinName) {
+                    try {
+                        const response = await fetch(`http://localhost:3000/api/vernacular?latin=${encodeURIComponent(latinName)}`);
+                        const data = await response.json();
+
+                        etNameSpan.textContent = data.et || "puudub";
+                        fiNameSpan.textContent = data.fi || "puudub";
+                        svNameSpan.textContent = data.sv || "puudub";
+                        enNameSpan.textContent = data.en || "missing";
+                        resultsDiv.style.display = 'block';
+                    } catch (error) {
+                        console.error("Viga API päringus:", error);
+                        resultsDiv.style.display = 'none';
+                        alert("Viga API päringus!");
+                    }
+                } else {
+                    alert("Palun sisesta ladinakeelne nimi.");
+                    resultsDiv.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
