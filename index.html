@@ -4,26 +4,133 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seenenimed</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; }
-        #results { margin-top: 20px; border: 1px solid #ccc; padding: 10px; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+        }
+        h1 {
+            color: #28a745; /* Metsaroheline */
+            margin-bottom: 40px;
+            text-align: center;
+            font-size: 3em;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        #nameForm {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            width: 100%;
+            max-width: 600px;
+        }
+        .form-label {
+            font-weight: bold;
+            color: #343a40;
+            margin-bottom: 10px;
+        }
+        .form-control {
+            padding: 15px;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            font-size: 1.1em;
+        }
+        .btn-primary {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .btn-primary:hover {
+            background-color: #1e7e34;
+        }
+        #results {
+            background-color: #e9ecef;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin-top: 40px;
+            width: 100%;
+            max-width: 600px;
+        }
+        #results h2 {
+            color: #28a745;
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-size: 2.5em;
+            font-weight: bold;
+            text-align: center;
+        }
+        #results p {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        #results span {
+            font-weight: bold;
+            color: #212529;
+        }
+        .flag-icon {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+        .puudub {
+            font-style: italic;
+            color: #dc3545; /* Punane puuduva jaoks */
+        }
+        .missing {
+            font-style: italic;
+            color: #dc3545;
+        }
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+            margin-top: 40px;
+        }
     </style>
 </head>
 <body>
-    <h1>Leia seenenimed</h1>
-    <form id="nameForm">
-        <label for="latinName">Ladinakeelne nimi:</label><br>
-        <input type="text" id="latinName" name="latinName" size="40"><br><br>
-        <button type="submit">Otsi</button>
-    </form>
+    <div class="container">
+        <h1>Leia seenenimed</h1>
+        <form id="nameForm">
+            <div class="mb-3">
+                <label for="latinName" class="form-label">Ladinakeelne nimi:</label>
+                <input type="text" class="form-control" id="latinName" name="latinName" size="40" placeholder="Näiteks: Boletus edulis">
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg w-100">Otsi</button>
+        </form>
 
-    <div id="results" style="display: none;">
-        <h2>Nimed:</h2>
-        <p>🇪🇪 Eesti nimi: <span id="etName"></span></p>
-        <p>🇫🇮 Soome nimi: <span id="fiName"></span></p>
-        <p>🇸🇪 Rootsi nimi: <span id="svName"></span></p>
-        <p>🇬🇧 Inglise nimi: <span id="enName"></span></p>
+        <div id="results" class="mt-5" style="display: none;">
+            <h2>Nimed:</h2>
+            <p><span class="flag-icon">🇪🇪</span> Eesti nimi: <span id="etName"></span></p>
+            <p><span class="flag-icon">🇫🇮</span> Soome nimi: <span id="fiName"></span></p>
+            <p><span class="flag-icon">🇸🇪</span> Rootsi nimi: <span id="svName"></span></p>
+            <p><span class="flag-icon">🇬🇧</span> Inglise nimi: <span id="enName"></span></p>
+        </div>
     </div>
+
+    <footer>
+        Seenenimede otsing | &copy; 2025
+    </footer>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -40,13 +147,13 @@
 
                 if (latinName) {
                     try {
-                        const response = await fetch(`http://localhost:3000/api/vernacular?latin=${encodeURIComponent(latinName)}`);
+                        const response = await fetch(`/api/vernacular?latin=${encodeURIComponent(latinName)}`);
                         const data = await response.json();
 
-                        etNameSpan.textContent = data.et || "puudub";
-                        fiNameSpan.textContent = data.fi || "puudub";
-                        svNameSpan.textContent = data.sv || "puudub";
-                        enNameSpan.textContent = data.en || "missing";
+                        etNameSpan.textContent = data.et || '<span class="puudub">puudub</span>';
+                        fiNameSpan.textContent = data.fi || '<span class="puudub">puudub</span>';
+                        svNameSpan.textContent = data.sv || '<span class="puudub">puudub</span>';
+                        enNameSpan.textContent = data.en || '<span class="missing">missing</span>';
                         resultsDiv.style.display = 'block';
                     } catch (error) {
                         console.error("Viga API päringus:", error);
@@ -60,5 +167,6 @@
             });
         });
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
