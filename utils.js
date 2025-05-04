@@ -2,12 +2,10 @@
 
 const axios = require('axios');
 const NodeCache = require('node-cache');
+const cheerio = require('cheerio');
 
 // Create a cache with 24-hour TTL
 const apiCache = new NodeCache({ stdTTL: 86400 });
-
-// API token for laji.fi
-const LAJI_FI_TOKEN = '7QLHuUdYIx9MNIlnUVgYxND3mSzXGGXRNsscKazTuGgFjcCIlKxMJJHdvy1J6Z4o';
 
 function formatLatinName(input) {
   if (!input || !input.includes(" ")) {
@@ -95,77 +93,216 @@ async function fetchLajiFiNames(latin) {
   try {
     console.log(`Fetching Finnish and Swedish names for ${latin}`);
     
-    // Try the FinBIF API directly with token (most reliable)
+    // Try scraping funet.fi for Finnish names (reliable source for Finnish mushroom names)
     try {
-      const url = `https://api.laji.fi/v0/taxa/${encodeURIComponent(latin)}?lang=multi&langFallback=true&access_token=${LAJI_FI_TOKEN}`;
-      console.log(`Trying FinBIF direct API: ${url}`);
+      console.log(`Trying funet.fi for ${latin}`);
       
-      const response = await axios.get(url);
+      // First, try to find the genus page
+      const genus = latin.split(' ')[0].toLowerCase();
+      const genusUrl = `https://www.funet.fi/pub/sci/bio/life/fungi/${genus}/index.html`;
       
-      if (response.data && response.data.vernacularName) {
-        const names = {
-          fi: response.data.vernacularName.fi ? capitalize(response.data.vernacularName.fi) : null,
-          sv: response.data.vernacularName.sv ? capitalize(response.data.vernacularName.sv) : null
-        };
+      const genusResponse = await axios.get(genusUrl);
+      
+      if (genusResponse.data) {
+        const $ = cheerio.load(genusResponse.data);
         
-        if (names.fi || names.sv) {
-          console.log(`Found names from FinBIF: FI=${names.fi}, SV=${names.sv}`);
+        // Look for the species in the genus page
+        let fiName = null;
+        let svName = null;
+        
+        $('a').each((i, el) => {
+          const href = $(el).attr('href');
+          const text = $(el).text().trim();
+          
+          // Check if this link contains our species
+          if (text.toLowerCase() === latin.toLowerCase() || 
+              text.toLowerCase().includes(latin.toLowerCase())) {
+            
+            // Get the parent element that contains the vernacular names
+            const parentElement = $(el).parent().parent();
+            const parentText = parentElement.text();
+            
+            // Look for Finnish name
+            const fiMatch = parentText.match(/\(fin: ([^,\)]+)/i);
+            if (fiMatch && fiMatch[1]) {
+              fiName = capitalize(fiMatch[1].trim());
+              console.log(`Found Finnish name from funet.fi: ${fiName}`);
+            }
+            
+            // Look for Swedish name
+            const svMatch = parentText.match(/\(swe: ([^,\)]+)/i);
+            if (svMatch && svMatch[1]) {
+              svName = capitalize(svMatch[1].trim());
+              console.log(`Found Swedish name from funet.fi: ${svName}`);
+            }
+            
+            return false; // Break the loop if found
+          }
+        });
+        
+        if (fiName || svName) {
+          const names = { fi: fiName, sv: svName };
           apiCache.set(cacheKey, names);
           return names;
         }
       }
     } catch (err) {
-      console.error(`Error with FinBIF direct API: ${err.message}`);
+      console.error(`Error with funet.fi: ${err.message}`);
     }
     
-    // Try the laji.fi search API
+    // Try luontoportti.com for Finnish names
     try {
-      const url = `https://api.laji.fi/v0/taxa/search?query=${encodeURIComponent(latin)}&matchType=exact&includePayload=true&onlyFungi=true&access_token=${LAJI_FI_TOKEN}`;
-      console.log(`Trying laji.fi search API: ${url}`);
+      console.log(`Trying luontoportti.com for ${latin}`);
       
-      const response = await axios.get(url);
+      // First try the direct URL
+      const speciesName = latin.replace(' ', '_').toLowerCase();
+      const directUrl = `https://www.luontoportti.com/suomi/en/sienet/${speciesName}`;
       
-      if (response.data && response.data.results && response.data.results.length > 0) {
-        const result = response.data.results[0];
+      try {
+        const directResponse = await axios.get(directUrl);
         
-        if (result.payload && result.payload.vernacularName) {
-          const names = {
-            fi: result.payload.vernacularName.fi ? capitalize(result.payload.vernacularName.fi) : null,
-            sv: result.payload.vernacularName.sv ? capitalize(result.payload.vernacularName.sv) : null
-          };
+        if (directResponse.data) {
+          const $ = cheerio.load(directResponse.data);
           
-          if (names.fi || names.sv) {
-            console.log(`Found names from laji.fi search: FI=${names.fi}, SV=${names.sv}`);
+          // Look for Finnish name
+          let fiName = null;
+          let svName = null;
+          
+          // Finnish name is usually in a specific format
+          $('.species-title').each((i, el) => {
+            const titleText = $(el).text().trim();
+            const fiMatch = titleText.match(/\(([^)]+)\)/);
+            if (fiMatch && fiMatch[1]) {
+              fiName = capitalize(fiMatch[1].trim());
+              console.log(`Found Finnish name from luontoportti.com: ${fiName}`);
+            }
+          });
+          
+          // Try to find Swedish name on the same page
+          $('.species-info').each((i, el) => {
+            const infoText = $(el).text().trim();
+            const svMatch = infoText.match(/Swedish: ([^,\n]+)/i);
+            if (svMatch && svMatch[1]) {
+              svName = capitalize(svMatch[1].trim());
+              console.log(`Found Swedish name from luontoportti.com: ${svName}`);
+            }
+          });
+          
+          if (fiName || svName) {
+            const names = { fi: fiName, sv: svName };
             apiCache.set(cacheKey, names);
             return names;
           }
         }
+      } catch (directErr) {
+        console.log(`No direct page for ${latin} on luontoportti.com`);
       }
-    } catch (err) {
-      console.error(`Error with laji.fi search API: ${err.message}`);
-    }
-    
-    // Try the public laji.fi API
-    try {
-      const url = `https://laji.fi/api/taxa/${encodeURIComponent(latin)}?lang=multi`;
-      console.log(`Trying public laji.fi API: ${url}`);
       
-      const response = await axios.get(url);
+      // If direct URL fails, try the search
+      const searchUrl = `https://www.luontoportti.com/suomi/en/sienet/search/?pattern=${encodeURIComponent(latin)}`;
+      const searchResponse = await axios.get(searchUrl);
       
-      if (response.data && response.data.vernacularName) {
-        const names = {
-          fi: response.data.vernacularName.fi ? capitalize(response.data.vernacularName.fi) : null,
-          sv: response.data.vernacularName.sv ? capitalize(response.data.vernacularName.sv) : null
-        };
+      if (searchResponse.data) {
+        const $ = cheerio.load(searchResponse.data);
+        let fiName = null;
+        let svName = null;
         
-        if (names.fi || names.sv) {
-          console.log(`Found names from public laji.fi: FI=${names.fi}, SV=${names.sv}`);
+        // Look for the species in search results
+        $('.species-list-item').each((i, el) => {
+          const scientificName = $(el).find('.scientific-name').text().trim();
+          if (scientificName.toLowerCase() === latin.toLowerCase()) {
+            // Finnish name is in the vernacular-name class
+            fiName = $(el).find('.vernacular-name').text().trim();
+            if (fiName) {
+              console.log(`Found Finnish name from luontoportti.com search: ${fiName}`);
+              
+              // Click through to the species page to try to find Swedish name
+              const speciesLink = $(el).find('a').attr('href');
+              if (speciesLink) {
+                // We'll handle this in a separate try-catch below
+                return false; // Break the loop
+              }
+            }
+          }
+        });
+        
+        // If we found a Finnish name but no Swedish name, try to get the Swedish name
+        if (fiName && !svName) {
+          try {
+            // Find the link to the species page
+            let speciesLink = null;
+            $('.species-list-item').each((i, el) => {
+              const scientificName = $(el).find('.scientific-name').text().trim();
+              if (scientificName.toLowerCase() === latin.toLowerCase()) {
+                speciesLink = $(el).find('a').attr('href');
+                return false; // Break the loop
+              }
+            });
+            
+            if (speciesLink) {
+              const speciesUrl = `https://www.luontoportti.com${speciesLink}`;
+              const speciesResponse = await axios.get(speciesUrl);
+              
+              if (speciesResponse.data) {
+                const $species = cheerio.load(speciesResponse.data);
+                
+                // Try to find Swedish name on the species page
+                $species('.species-info').each((i, el) => {
+                  const infoText = $species(el).text().trim();
+                  const svMatch = infoText.match(/Swedish: ([^,\n]+)/i);
+                  if (svMatch && svMatch[1]) {
+                    svName = capitalize(svMatch[1].trim());
+                    console.log(`Found Swedish name from luontoportti.com species page: ${svName}`);
+                  }
+                });
+              }
+            }
+          } catch (speciesErr) {
+            console.error(`Error getting species page: ${speciesErr.message}`);
+          }
+        }
+        
+        if (fiName || svName) {
+          const names = { fi: fiName, sv: svName };
           apiCache.set(cacheKey, names);
           return names;
         }
       }
     } catch (err) {
-      console.error(`Error with public laji.fi API: ${err.message}`);
+      console.error(`Error with luontoportti.com: ${err.message}`);
+    }
+    
+    // Try dyntaxa.se for Swedish names
+    try {
+      console.log(`Trying dyntaxa.se for ${latin}`);
+      const searchUrl = `https://dyntaxa.se/taxon/info/${encodeURIComponent(latin)}`;
+      
+      const response = await axios.get(searchUrl);
+      
+      if (response.data) {
+        const $ = cheerio.load(response.data);
+        let svName = null;
+        
+        // Look for Swedish name
+        $('.vernacular-name').each((i, el) => {
+          const lang = $(el).find('.language').text().trim();
+          if (lang.toLowerCase() === 'svenska') {
+            svName = $(el).find('.name').text().trim();
+            if (svName) {
+              console.log(`Found Swedish name from dyntaxa.se: ${svName}`);
+              return false; // Break the loop
+            }
+          }
+        });
+        
+        if (svName) {
+          const names = { fi: null, sv: svName };
+          apiCache.set(cacheKey, names);
+          return names;
+        }
+      }
+    } catch (err) {
+      console.error(`Error with dyntaxa.se: ${err.message}`);
     }
     
     // Try to get names from Finnish Wikipedia
