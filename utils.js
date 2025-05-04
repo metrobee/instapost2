@@ -34,7 +34,7 @@ async function fetchEstonianWikiName(latin) {
         origin: '*'
       },
       headers: {
-        'User-Agent': 'VernacularWebApp/1.0 (https://github.com/yourusername/vernacular-web; your-email@example.com)'
+        'User-Agent': 'VernacularWebApp/1.0'
       }
     });
     const pages = wiki.data?.query?.pages;
@@ -66,26 +66,27 @@ async function fetchEstonianWikiName(latin) {
 
 async function fetchLajiFiNames(latin) {
   try {
+    // Use the correct API endpoint and parameters
     const searchRes = await axios.get(
-      `https://api.laji.fi/v0/taxa/search?query=${encodeURIComponent(latin)}&limit=1&access_token=${LAJI_FI_TOKEN}`
+      `https://api.laji.fi/v0/taxa/search?query=${encodeURIComponent(latin)}&limit=1&includePayload=true&matchType=exact&access_token=${LAJI_FI_TOKEN}`
     );
 
-    if (searchRes.data?.results && Array.isArray(searchRes.data.results) && searchRes.data.results.length > 0) {
+    console.log('Laji.fi response:', JSON.stringify(searchRes.data, null, 2));
+
+    if (searchRes.data && searchRes.data.results && Array.isArray(searchRes.data.results) && searchRes.data.results.length > 0) {
+      const result = searchRes.data.results[0];
       return {
-        fi: capitalize(searchRes.data.results[0]?.vernacularName?.fi) || null,
-        sv: capitalize(searchRes.data.results[0]?.vernacularName?.sv) || null
-      };
-    } else if (Array.isArray(searchRes.data) && searchRes.data.length > 0) {
-      return {
-        fi: capitalize(searchRes.data[0]?.vernacularName?.fi) || null,
-        sv: capitalize(searchRes.data[0]?.vernacularName?.sv) || null
+        fi: capitalize(result.vernacularName?.fi || '') || null,
+        sv: capitalize(result.vernacularName?.sv || '') || null
       };
     }
+    return { fi: null, sv: null };
   } catch (err) {
-    console.error("Laji.fi error:", err.response?.status, err.message, err.response?.data);
+    console.error("Laji.fi error:", err.message);
+    console.error("Laji.fi response status:", err.response?.status);
+    console.error("Laji.fi response data:", err.response?.data);
     return { fi: null, sv: null };
   }
-  return { fi: null, sv: null };
 }
 
 async function fetchGBIFName(latin) {
@@ -96,7 +97,8 @@ async function fetchGBIFName(latin) {
     const vernacular = await axios.get(`https://api.gbif.org/v1/species/${match.data.usageKey}/vernacularNames`);
     const eng = vernacular.data.results.find(e => e.language === "eng");
     return eng?.vernacularName ? capitalize(eng.vernacularName) : null;
-  } catch {
+  } catch (err) {
+    console.error("GBIF error:", err.message);
     return null;
   }
 }

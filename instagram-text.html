@@ -238,6 +238,17 @@
         .suggestion-item:last-child {
             border-bottom: none;
         }
+        .debug-info {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.8em;
+            white-space: pre-wrap;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -327,6 +338,8 @@
             </div>
             <div class="copy-success" id="copySuccess">Tekst kopeeritud!</div>
         </div>
+        
+        <div class="debug-info" id="debugInfo"></div>
     </div>
 
     <footer>
@@ -349,6 +362,7 @@
             const useAIDescription = document.getElementById('useAIDescription');
             const latinNameInput = document.getElementById('latinName');
             const suggestionsList = document.getElementById('suggestionsList');
+            const debugInfo = document.getElementById('debugInfo');
             
             let typingTimer;
             const doneTypingInterval = 500; // ms
@@ -383,6 +397,20 @@
                 }
             }
             
+            // Function to log debug information
+            function logDebug(message, data) {
+                console.log(message, data);
+                debugInfo.style.display = 'block';
+                debugInfo.textContent += `${message}\n`;
+                if (data) {
+                    if (typeof data === 'object') {
+                        debugInfo.textContent += JSON.stringify(data, null, 2) + '\n\n';
+                    } else {
+                        debugInfo.textContent += data + '\n\n';
+                    }
+                }
+            }
+            
             // Function to fetch mushroom suggestions from API
             async function fetchSuggestions(query) {
                 if (query.length < 3) {
@@ -391,15 +419,21 @@
                 }
                 
                 try {
+                    logDebug(`Fetching suggestions for: ${query}`);
+                    
                     const response = await fetch(`/api/suggestions?q=${encodeURIComponent(query)}`);
+                    
                     if (response.ok) {
                         const suggestions = await response.json();
+                        logDebug(`Received ${suggestions.length} suggestions`, suggestions);
                         displaySuggestions(suggestions);
                     } else {
+                        const errorText = await response.text();
+                        logDebug(`Error fetching suggestions: ${response.status}`, errorText);
                         suggestionsList.style.display = 'none';
                     }
                 } catch (error) {
-                    console.error('Error fetching suggestions:', error);
+                    logDebug(`Error fetching suggestions: ${error.message}`);
                     suggestionsList.style.display = 'none';
                 }
             }
@@ -453,16 +487,21 @@
                 
                 try {
                     descriptionField.value = "Generating description...";
+                    logDebug(`Fetching description for: ${latinName}`);
+                    
                     const response = await fetch(`/api/description?name=${encodeURIComponent(latinName)}`);
                     
                     if (response.ok) {
                         const data = await response.json();
+                        logDebug(`Received description`, data);
                         descriptionField.value = data.description || "";
                     } else {
+                        const errorText = await response.text();
+                        logDebug(`Error fetching description: ${response.status}`, errorText);
                         descriptionField.value = "Failed to generate description.";
                     }
                 } catch (error) {
-                    console.error("Error generating description:", error);
+                    logDebug(`Error generating description: ${error.message}`);
                     descriptionField.value = "Error generating description.";
                 }
             }
@@ -501,6 +540,7 @@
                 // Show loading indicator
                 loading.style.display = 'block';
                 postTextOutput.style.display = 'none';
+                debugInfo.textContent = ''; // Clear debug info
                 
                 try {
                     // Properly capitalize Latin name (first word capitalized, second word lowercase)
@@ -511,9 +551,18 @@
                         latinName = capitalizeWords(latinName);
                     }
                     
+                    logDebug(`Fetching vernacular names for: ${latinName}`);
+                    
                     // Fetch vernacular names
                     const response = await fetch(`/api/vernacular?latin=${encodeURIComponent(latinName)}`);
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`API error: ${response.status} - ${errorText}`);
+                    }
+                    
                     const data = await response.json();
+                    logDebug(`Received vernacular names`, data);
                     
                     // Use the properly capitalized Latin name returned from the API if available
                     latinName = data.latinName || latinName;
@@ -649,8 +698,8 @@
                     postTextOutput.style.display = 'block';
                     
                 } catch (error) {
-                    console.error("Viga API päringus:", error);
-                    alert("Viga API päringus!");
+                    logDebug(`Error: ${error.message}`);
+                    alert(`Viga API päringus: ${error.message}`);
                     loading.style.display = 'none';
                 }
             });
@@ -672,6 +721,13 @@
                 }).catch(err => {
                     console.error('Failed to copy text: ', err);
                 });
+            });
+            
+            // Add keyboard shortcut for debugging (Ctrl+Shift+D)
+            document.addEventListener('keydown', function(event) {
+                if (event.ctrlKey && event.shiftKey && event.key === 'D') {
+                    debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 'none';
+                }
             });
         });
     </script>
