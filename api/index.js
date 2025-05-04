@@ -2,6 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const { formatLatinName, capitalize, fetchEstonianWikiName, fetchLajiFiNames, fetchGBIFName } = require('../utils');
+const descriptionGenerator = require('./generate-description');
 
 const app = express();
 app.use(cors());
@@ -32,6 +33,23 @@ app.get('/api/vernacular', async (req, res) => {
   } catch (error) {
     console.error('Error fetching vernacular names:', error);
     res.status(500).json({ error: 'Failed to fetch vernacular names' });
+  }
+});
+
+// API endpoint for mushroom descriptions
+app.get('/api/description', (req, res) => {
+  const latinName = req.query.name;
+  
+  if (!latinName) {
+    return res.status(400).json({ error: 'Latin name is required' });
+  }
+  
+  try {
+    const description = descriptionGenerator.getMushroomDescription(latinName);
+    res.json({ description });
+  } catch (error) {
+    console.error('Error generating description:', error);
+    res.status(500).json({ error: 'Failed to generate description' });
   }
 });
 

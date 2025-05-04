@@ -210,11 +210,28 @@
         .location-row .form-group {
             flex: 1;
         }
+        .form-check {
+            margin-bottom: 15px;
+        }
+        .generate-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-bottom: 15px;
+        }
+        .generate-btn:hover {
+            background-color: #5a6268;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Seene Instagram Teksti Generator</h1>
+        <h1>myscelium insta maker</h1>
         
         <form id="nameForm">
             <div class="mb-3">
@@ -262,11 +279,19 @@
             </div>
             
             <div class="mb-3">
-                <label for="description" class="form-label">Description (optional):</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="useAIDescription" checked>
+                    <label class="form-check-label" for="useAIDescription">
+                        Use AI-generated description
+                    </label>
+                </div>
+                <button type="button" id="generateDescriptionBtn" class="generate-btn">
+                    <i class="fas fa-magic"></i> Generate Description
+                </button>
                 <textarea class="description-area" id="description" name="description" placeholder="Enter a description for your mushroom find (leave empty for no description)..."></textarea>
             </div>
             
-            <button type="submit" class="btn btn-primary btn-lg w-100">Loo Instagram Tekst</button>
+            <button type="submit" class="btn btn-primary btn-lg w-100">Koosta tekst</button>
         </form>
 
         <div class="loading" id="loading">
@@ -277,7 +302,7 @@
         </div>
 
         <div id="postTextOutput">
-            <div class="output-title">Instagram Postituse Tekst:</div>
+            <div class="output-title">Instagram Postituse sisu:</div>
             <div class="post-text" id="generatedText"></div>
             <div class="language-names" id="languageNames"></div>
             <div>
@@ -293,7 +318,7 @@
     </div>
 
     <footer>
-        Seene Instagram Teksti Generator | &copy; 2025
+        myscelium insta maker | &copy; 2025
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -309,6 +334,9 @@
             const editBtn = document.getElementById('editBtn');
             const copySuccess = document.getElementById('copySuccess');
             const loading = document.getElementById('loading');
+            const generateDescriptionBtn = document.getElementById('generateDescriptionBtn');
+            const descriptionField = document.getElementById('description');
+            const useAIDescription = document.getElementById('useAIDescription');
             
             // Set current month and year as default
             const now = new Date();
@@ -350,6 +378,11 @@
                         selection: (event) => {
                             const selection = event.detail.selection.value;
                             autoCompleteJS.input.value = selection;
+                            
+                            // If AI description is enabled, generate a description when a mushroom is selected
+                            if (useAIDescription.checked) {
+                                generateDescription(selection);
+                            }
                         }
                     }
                 },
@@ -373,6 +406,36 @@
                     default: return '';
                 }
             }
+            
+            // Function to fetch mushroom description
+            async function generateDescription(latinName) {
+                if (!latinName) return;
+                
+                try {
+                    descriptionField.value = "Generating description...";
+                    const response = await fetch(`/api/description?name=${encodeURIComponent(latinName)}`);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        descriptionField.value = data.description || "";
+                    } else {
+                        descriptionField.value = "Failed to generate description.";
+                    }
+                } catch (error) {
+                    console.error("Error generating description:", error);
+                    descriptionField.value = "Error generating description.";
+                }
+            }
+            
+            // Generate description button handler
+            generateDescriptionBtn.addEventListener('click', () => {
+                const latinName = document.getElementById('latinName').value.trim();
+                if (latinName) {
+                    generateDescription(latinName);
+                } else {
+                    alert("Please enter a Latin name first.");
+                }
+            });
             
             // Function to fetch conservation status from API
             async function fetchConservationStatus(latinName) {
@@ -470,6 +533,9 @@
                         });
                         namesList += enNames.join('\n') + '\n';
                     }
+                    
+                    // Add an extra line break after the names list
+                    namesList += '\n';
                     
                     // Get user-entered values
                     const month = document.getElementById('month').value;
