@@ -1,12 +1,12 @@
+// Serverless API endpoint for Vercel
 const express = require('express');
-const axios = require('axios');
 const cors = require('cors');
-const { formatLatinName, capitalize, fetchEstonianWikiName, fetchLajiFiNames, fetchGBIFName } = require('../utils'); // NB! Tee kindlaks, et tee failini utils.js on õige
+const { formatLatinName, capitalize, fetchEstonianWikiName, fetchLajiFiNames, fetchGBIFName } = require('../utils');
 
 const app = express();
-
 app.use(cors());
 
+// API endpoint for vernacular names
 app.get('/api/vernacular', async (req, res) => {
   const latinName = req.query.latin;
 
@@ -14,18 +14,26 @@ app.get('/api/vernacular', async (req, res) => {
     return res.status(400).json({ error: 'Palun sisesta ladinakeelne nimi.' });
   }
 
-  const formatted = formatLatinName(latinName);
+  try {
+    const formatted = formatLatinName(latinName);
 
-  const names = {
-    et: await fetchEstonianWikiName(formatted),
-    ...await fetchLajiFiNames(formatted),
-    en: await fetchGBIFName(formatted),
-  };
+    const names = {
+      latinName: formatted, // Return the properly formatted Latin name
+      et: capitalize(await fetchEstonianWikiName(formatted) || ''),
+      ...await fetchLajiFiNames(formatted),
+      en: capitalize(await fetchGBIFName(formatted) || ''),
+    };
 
-  res.json(names);
+    // Capitalize Finnish and Swedish names
+    if (names.fi) names.fi = capitalize(names.fi);
+    if (names.sv) names.sv = capitalize(names.sv);
+
+    res.json(names);
+  } catch (error) {
+    console.error('Error fetching vernacular names:', error);
+    res.status(500).json({ error: 'Failed to fetch vernacular names' });
+  }
 });
 
-// Ekspordi Express app serverless funktsioonina
-module.exports = async (req, res) => {
-  await app(req, res);
-};
+// Export the Express app as a serverless function
+module.exports = app;
