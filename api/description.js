@@ -36,12 +36,6 @@ async function fetchMushroomDescription(latinName) {
       return gbifDescription;
     }
     
-    // Try to get description from MushroomExpert
-    const mushroomExpertDescription = await fetchFromMushroomExpert(latinName);
-    if (mushroomExpertDescription) {
-      return mushroomExpertDescription;
-    }
-    
     // If all else fails, return a generic description
     return generateGenericDescription(latinName);
   } catch (error) {
@@ -116,55 +110,18 @@ async function fetchFromGBIF(latinName) {
   }
 }
 
-// Fetch description from MushroomExpert.com
-async function fetchFromMushroomExpert(latinName) {
-  try {
-    // This is a simplified approach - in reality, you'd need to handle the search more robustly
-    const genus = latinName.split(' ')[0].toLowerCase();
-    const response = await axios.get(`https://www.mushroomexpert.com/${genus}.html`);
-    
-    if (response.data) {
-      const $ = cheerio.load(response.data);
-      
-      // Look for paragraphs that mention the species
-      const speciesName = latinName.split(' ')[1].toLowerCase();
-      let relevantText = '';
-      
-      $('p').each((i, el) => {
-        const text = $(el).text().toLowerCase();
-        if (text.includes(speciesName)) {
-          relevantText = $(el).text();
-          return false; // Break the loop
-        }
-      });
-      
-      if (relevantText) {
-        // Limit to 2-3 sentences
-        const sentences = relevantText.split(/[.!?]+/);
-        if (sentences.length > 3) {
-          relevantText = sentences.slice(0, 3).join('. ') + '.';
-        }
-        
-        return relevantText;
-      }
-    }
-    return null;
-  } catch (error) {
-    console.error('MushroomExpert error:', error.message);
-    return null;
-  }
-}
-
 // Generate a generic description based on the Latin name
 function generateGenericDescription(latinName) {
   const genus = latinName.split(' ')[0];
   const species = latinName.split(' ')[1] || '';
   
+  // Use the species name to deterministically select a template
   const templates = [
     `${latinName} is a fascinating fungus found in forest ecosystems. Like other members of the ${genus} genus, it plays an important role in nutrient cycling and biodiversity.`,
     `This species (${latinName}) is part of the ${genus} genus, known for its distinctive characteristics and ecological importance in woodland habitats.`,
     `${latinName} is an interesting mushroom species that showcases the incredible diversity of fungi in our forests. It contributes to the complex web of relationships in forest ecosystems.`,
-    `Found in its natural habitat, ${latinName} is a representative of the ${genus} genus, which includes various species with unique ecological adaptations.`
+    `Found in its natural habitat, ${latinName} is a representative of the ${genus} genus, which includes various species with unique ecological adaptations.`,
+    `This beautiful specimen of ${latinName} demonstrates the important role fungi play in forest ecosystems, forming relationships with trees and other organisms.`
   ];
   
   // Select a template based on the species name length to ensure consistency

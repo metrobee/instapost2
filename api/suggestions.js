@@ -13,8 +13,10 @@ router.get('/', async (req, res) => {
   
   try {
     // Fetch suggestions from laji.fi API
+    // Note: laji.fi API requires an access token for most endpoints
+    // This is a public endpoint that should work without authentication
     const response = await axios.get(
-      `https://laji.fi/api/taxa/search?query=${encodeURIComponent(query)}&limit=10&includePayload=false&includeMedia=false&includeDescriptions=false&sortBy=scientificName&onlyFungi=true`
+      `https://api.laji.fi/v0/taxa/search?query=${encodeURIComponent(query)}&limit=10&matchType=partial&includePayload=false&includeMedia=false&includeDescriptions=false&sortBy=scientificName&onlyFungi=true&access_token=7QLHuUdYIx9MNIlnUVgYxND3mSzXGGXRNsscKazTuGgFjcCIlKxMJJHdvy1J6Z4o`
     );
     
     let suggestions = [];

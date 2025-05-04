@@ -480,18 +480,8 @@
             // Function to fetch conservation status from API
             async function fetchConservationStatus(latinName) {
                 try {
-                    // In a real implementation, this would call your conservation API
-                    // For now, we'll use a simplified approach for the demo
-                    
-                    // Special case for Crustoderma dryinum
-                    if (latinName.toLowerCase() === 'crustoderma dryinum') {
-                        return {
-                            peikonnahka: 'NT',
-                            rostskinn: 'VU',
-                            rustskinn: 'VU'
-                        };
-                    }
-                    
+                    // This would be replaced with an actual API call in a production environment
+                    // For now, we'll just return an empty object
                     return {};
                 } catch (error) {
                     console.error('Error fetching conservation status:', error);
