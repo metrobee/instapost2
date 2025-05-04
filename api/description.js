@@ -51,7 +51,15 @@ async function fetchMushroomDescription(latinName) {
       return wikiDescription;
     }
     
-    // 2. Try GBIF
+    // 2. Try iNaturalist
+    console.log(`Trying iNaturalist for ${latinName}`);
+    const iNaturalistDescription = await fetchFromINaturalist(latinName);
+    if (iNaturalistDescription) {
+      console.log(`Found iNaturalist description for ${latinName}`);
+      return iNaturalistDescription;
+    }
+    
+    // 3. Try GBIF
     console.log(`Trying GBIF for ${latinName}`);
     const gbifDescription = await fetchFromGBIF(latinName);
     if (gbifDescription) {
@@ -59,7 +67,7 @@ async function fetchMushroomDescription(latinName) {
       return gbifDescription;
     }
     
-    // 3. Try MushroomExpert
+    // 4. Try MushroomExpert
     console.log(`Trying MushroomExpert for ${latinName}`);
     const mushroomExpertDescription = await fetchFromMushroomExpert(latinName);
     if (mushroomExpertDescription) {
@@ -67,7 +75,7 @@ async function fetchMushroomDescription(latinName) {
       return mushroomExpertDescription;
     }
     
-    // 4. Try MycoBank
+    // 5. Try MycoBank
     console.log(`Trying MycoBank for ${latinName}`);
     const mycoBankDescription = await fetchFromMycoBank(latinName);
     if (mycoBankDescription) {
@@ -75,12 +83,12 @@ async function fetchMushroomDescription(latinName) {
       return mycoBankDescription;
     }
     
-    // 5. Try iNaturalist
-    console.log(`Trying iNaturalist for ${latinName}`);
-    const iNaturalistDescription = await fetchFromINaturalist(latinName);
-    if (iNaturalistDescription) {
-      console.log(`Found iNaturalist description for ${latinName}`);
-      return iNaturalistDescription;
+    // 6. Try Mushroom Observer
+    console.log(`Trying Mushroom Observer for ${latinName}`);
+    const mushroomObserverDescription = await fetchFromMushroomObserver(latinName);
+    if (mushroomObserverDescription) {
+      console.log(`Found Mushroom Observer description for ${latinName}`);
+      return mushroomObserverDescription;
     }
     
     // If all else fails, generate a generic description
@@ -95,28 +103,97 @@ async function fetchMushroomDescription(latinName) {
 // Fetch description from Wikipedia
 async function fetchFromWikipedia(latinName) {
   try {
-    // Wikipedia API doesn't require authentication for basic usage
+    // Try the summary API first
     const response = await axios.get(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(latinName)}`, {
       headers: {
         'User-Agent': 'VernacularWebApp/1.0'
       }
     });
     
-    if (response.data && response.data.extract) {
+    if (response.data && response.data.extract && response.data.extract.length > 50) {
       // Clean up and limit the description
       let description = response.data.extract;
       
       // Limit to 2-3 sentences
-      const sentences = description.split(/[.!?]+/);
+      const sentences = description.split(/[.!?]+/).filter(s => s.trim().length > 0);
       if (sentences.length > 3) {
         description = sentences.slice(0, 3).join('. ') + '.';
       }
       
       return description;
     }
+    
+    // If summary API doesn't return a good description, try the content API
+    const contentResponse = await axios.get(`https://en.wikipedia.org/w/api.php`, {
+      params: {
+        action: 'query',
+        format: 'json',
+        titles: latinName,
+        prop: 'extracts',
+        exintro: true,
+        explaintext: true,
+        origin: '*'
+      }
+    });
+    
+    const pages = contentResponse.data?.query?.pages;
+    if (pages) {
+      const pageId = Object.keys(pages)[0];
+      if (!pageId.startsWith('-')) { // Skip if page doesn't exist
+        const extract = pages[pageId].extract;
+        if (extract && extract.length > 50) {
+          // Limit to 2-3 sentences
+          const sentences = extract.split(/[.!?]+/).filter(s => s.trim().length > 0);
+          if (sentences.length > 3) {
+            return sentences.slice(0, 3).join('. ') + '.';
+          }
+          return extract;
+        }
+      }
+    }
+    
     return null;
   } catch (error) {
     console.error('Wikipedia error:', error.message);
+    return null;
+  }
+}
+
+// Fetch description from iNaturalist
+async function fetchFromINaturalist(latinName) {
+  try {
+    const response = await axios.get(`https://api.inaturalist.org/v1/taxa?q=${encodeURIComponent(latinName)}&limit=1`);
+    
+    if (response.data && response.data.results && response.data.results.length > 0) {
+      const taxon = response.data.results[0];
+      
+      // Try Wikipedia summary from iNaturalist
+      if (taxon.wikipedia_summary && taxon.wikipedia_summary.length > 50) {
+        // Limit to 2-3 sentences
+        const sentences = taxon.wikipedia_summary.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        if (sentences.length > 3) {
+          return sentences.slice(0, 3).join('. ') + '.';
+        }
+        return taxon.wikipedia_summary;
+      }
+      
+      // Try description from iNaturalist
+      if (taxon.description && taxon.description.length > 50) {
+        // Remove HTML tags
+        let description = taxon.description.replace(/<[^>]*>/g, '');
+        
+        // Limit to 2-3 sentences
+        const sentences = description.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        if (sentences.length > 3) {
+          return sentences.slice(0, 3).join('. ') + '.';
+        }
+        return description;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('iNaturalist error:', error.message);
     return null;
   }
 }
@@ -139,7 +216,7 @@ async function fetchFromGBIF(latinName) {
           desc.language === 'eng' || desc.language === 'en'
         );
         
-        if (englishDescription && englishDescription.description) {
+        if (englishDescription && englishDescription.description && englishDescription.description.length > 50) {
           // Clean up and limit the description
           let description = englishDescription.description;
           
@@ -147,9 +224,9 @@ async function fetchFromGBIF(latinName) {
           description = description.replace(/<[^>]*>/g, '');
           
           // Limit to 2-3 sentences
-          const sentences = description.split(/[.!?]+/);
+          const sentences = description.split(/[.!?]+/).filter(s => s.trim().length > 0);
           if (sentences.length > 3) {
-            description = sentences.slice(0, 3).join('. ') + '.';
+            return sentences.slice(0, 3).join('. ') + '.';
           }
           
           return description;
@@ -187,11 +264,11 @@ async function fetchFromMushroomExpert(latinName) {
           }
         });
         
-        if (description) {
+        if (description && description.length > 50) {
           // Limit to 2-3 sentences
-          const sentences = description.split(/[.!?]+/);
+          const sentences = description.split(/[.!?]+/).filter(s => s.trim().length > 0);
           if (sentences.length > 3) {
-            description = sentences.slice(0, 3).join('. ') + '.';
+            return sentences.slice(0, 3).join('. ') + '.';
           }
           
           return description;
@@ -213,17 +290,17 @@ async function fetchFromMushroomExpert(latinName) {
         
         $('p').each((i, el) => {
           const text = $(el).text().toLowerCase();
-          if (text.includes(species)) {
+          if (text.includes(species) && text.length > 100) {
             relevantText = $(el).text().trim();
             return false; // Break the loop
           }
         });
         
-        if (relevantText) {
+        if (relevantText && relevantText.length > 50) {
           // Limit to 2-3 sentences
-          const sentences = relevantText.split(/[.!?]+/);
+          const sentences = relevantText.split(/[.!?]+/).filter(s => s.trim().length > 0);
           if (sentences.length > 3) {
-            relevantText = sentences.slice(0, 3).join('. ') + '.';
+            return sentences.slice(0, 3).join('. ') + '.';
           }
           
           return relevantText;
@@ -273,11 +350,11 @@ async function fetchFromMycoBank(latinName) {
           return false; // Break the loop
         });
         
-        if (description) {
+        if (description && description.length > 50) {
           // Limit to 2-3 sentences
-          const sentences = description.split(/[.!?]+/);
+          const sentences = description.split(/[.!?]+/).filter(s => s.trim().length > 0);
           if (sentences.length > 3) {
-            description = sentences.slice(0, 3).join('. ') + '.';
+            return sentences.slice(0, 3).join('. ') + '.';
           }
           
           return description;
@@ -292,40 +369,72 @@ async function fetchFromMycoBank(latinName) {
   }
 }
 
-// Fetch description from iNaturalist
-async function fetchFromINaturalist(latinName) {
+// Fetch description from Mushroom Observer
+async function fetchFromMushroomObserver(latinName) {
   try {
-    // Search for the species on iNaturalist
-    const searchUrl = `https://api.inaturalist.org/v1/taxa?q=${encodeURIComponent(latinName)}&limit=1`;
-    const searchResponse = await axios.get(searchUrl);
+    const response = await axios.get(`https://mushroomobserver.org/api/names?format=json&name=${encodeURIComponent(latinName)}`);
     
-    if (searchResponse.data && searchResponse.data.results && searchResponse.data.results.length > 0) {
-      const taxon = searchResponse.data.results[0];
+    if (response.data && response.data.results && response.data.results.length > 0) {
+      const result = response.data.results[0];
       
-      if (taxon.wikipedia_summary) {
+      if (result.notes && result.notes.length > 50) {
         // Limit to 2-3 sentences
-        const sentences = taxon.wikipedia_summary.split(/[.!?]+/);
+        const sentences = result.notes.split(/[.!?]+/).filter(s => s.trim().length > 0);
         if (sentences.length > 3) {
           return sentences.slice(0, 3).join('. ') + '.';
         }
         
-        return taxon.wikipedia_summary;
+        return result.notes;
       }
       
-      if (taxon.description) {
-        // Limit to 2-3 sentences
-        const sentences = taxon.description.split(/[.!?]+/);
-        if (sentences.length > 3) {
-          return sentences.slice(0, 3).join('. ') + '.';
+      // If no notes, try to get the description from the species page
+      if (result.id) {
+        try {
+          const pageUrl = `https://mushroomobserver.org/${result.id}`;
+          const pageResponse = await axios.get(pageUrl);
+          
+          if (pageResponse.data) {
+            const $ = cheerio.load(pageResponse.data);
+            
+            // Look for description in various places
+            let description = '';
+            
+            // Try the description section
+            $('.Description').each((i, el) => {
+              if (!description) {
+                description = $(el).text().trim();
+              }
+            });
+            
+            // If no description found, try paragraphs
+            if (!description) {
+              $('p').each((i, el) => {
+                const text = $(el).text().trim();
+                if (!description && text.length > 100) {
+                  description = text;
+                }
+              });
+            }
+            
+            if (description && description.length > 50) {
+              // Limit to 2-3 sentences
+              const sentences = description.split(/[.!?]+/).filter(s => s.trim().length > 0);
+              if (sentences.length > 3) {
+                return sentences.slice(0, 3).join('. ') + '.';
+              }
+              
+              return description;
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching Mushroom Observer page:', err.message);
         }
-        
-        return taxon.description;
       }
     }
     
     return null;
   } catch (error) {
-    console.error('iNaturalist error:', error.message);
+    console.error('Mushroom Observer API error:', error.message);
     return null;
   }
 }
