@@ -17,22 +17,20 @@ router.get('/', async (req, res) => {
   try {
     console.log(`Fetching suggestions for query: ${query}`);
     
-    // Construct the URL with proper parameters
-    const url = `https://api.laji.fi/v0/taxa/search?query=${encodeURIComponent(query)}&limit=10&includePayload=false&matchType=partial&onlyFungi=true&access_token=${LAJI_FI_TOKEN}`;
+    // Try the most reliable endpoint first
+    const url = `https://api.laji.fi/v0/taxa?taxonomyId=MX.37600&lang=fi&langFallback=true&maxLevel=4&query=${encodeURIComponent(query)}&access_token=${LAJI_FI_TOKEN}`;
     console.log(`Laji.fi URL: ${url}`);
     
-    // Fetch suggestions from laji.fi API with the token
     const response = await axios.get(url);
-    
     console.log('Laji.fi suggestions response status:', response.status);
     
     let suggestions = [];
     
-    if (response.data && response.data.results && Array.isArray(response.data.results)) {
-      console.log(`Found ${response.data.results.length} suggestions`);
+    if (response.data && Array.isArray(response.data)) {
+      console.log(`Found ${response.data.length} potential matches`);
       
       // Extract scientific names from the results
-      suggestions = response.data.results
+      suggestions = response.data
         .filter(item => item.scientificName)
         .map(item => item.scientificName)
         .sort(); // Sort alphabetically
@@ -41,6 +39,23 @@ router.get('/', async (req, res) => {
     } else {
       console.log('No results found or unexpected response format');
       console.log('Response data:', JSON.stringify(response.data, null, 2));
+      
+      // Try alternative endpoint if the first one fails
+      const altUrl = `https://api.laji.fi/v0/taxa/search?query=${encodeURIComponent(query)}&access_token=${LAJI_FI_TOKEN}`;
+      console.log(`Trying alternative Laji.fi URL: ${altUrl}`);
+      
+      const altResponse = await axios.get(altUrl);
+      
+      if (altResponse.data && altResponse.data.results && Array.isArray(altResponse.data.results)) {
+        console.log(`Found ${altResponse.data.results.length} results from alternative endpoint`);
+        
+        suggestions = altResponse.data.results
+          .filter(item => item.scientificName)
+          .map(item => item.scientificName)
+          .sort();
+        
+        console.log('Processed suggestions from alternative endpoint:', suggestions);
+      }
     }
     
     res.json(suggestions);
@@ -48,7 +63,7 @@ router.get('/', async (req, res) => {
     console.error('Error fetching suggestions:', error.message);
     if (error.response) {
       console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
+      console.error('Response data:', JSON.stringify(error.response.data, null, 2));
     }
     res.status(500).json({ error: 'Failed to fetch suggestions', details: error.message });
   }

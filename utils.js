@@ -68,39 +68,57 @@ async function fetchLajiFiNames(latin) {
   try {
     console.log(`Fetching Finnish and Swedish names for ${latin} from laji.fi`);
     
-    // Use the correct API endpoint with proper parameters
-    const url = `https://api.laji.fi/v0/taxa/search?query=${encodeURIComponent(latin)}&limit=1&includePayload=true&matchType=exact&access_token=${LAJI_FI_TOKEN}`;
+    // Direct API call with minimal parameters to ensure it works
+    const url = `https://api.laji.fi/v0/taxa?taxonomyId=MX.37600&lang=fi&langFallback=true&maxLevel=4&query=${encodeURIComponent(latin)}&access_token=${LAJI_FI_TOKEN}`;
     console.log(`Laji.fi URL: ${url}`);
     
-    const searchRes = await axios.get(url);
-    console.log(`Laji.fi response status: ${searchRes.status}`);
+    const response = await axios.get(url);
+    console.log(`Laji.fi response status: ${response.status}`);
     
-    if (searchRes.data && searchRes.data.results && Array.isArray(searchRes.data.results) && searchRes.data.results.length > 0) {
-      const result = searchRes.data.results[0];
-      console.log(`Found result for ${latin}:`, result.matchingName);
+    // Log the entire response for debugging
+    console.log('Full response:', JSON.stringify(response.data, null, 2));
+    
+    if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+      // Find the matching taxon
+      const matchingTaxon = response.data.find(taxon => 
+        taxon.scientificName.toLowerCase() === latin.toLowerCase()
+      );
       
-      const fiName = result.vernacularName?.fi;
-      const svName = result.vernacularName?.sv;
-      
-      console.log(`Finnish name: ${fiName || 'not found'}`);
-      console.log(`Swedish name: ${svName || 'not found'}`);
+      if (matchingTaxon) {
+        console.log('Found matching taxon:', matchingTaxon.scientificName);
+        
+        return {
+          fi: matchingTaxon.vernacularName?.fi ? capitalize(matchingTaxon.vernacularName.fi) : null,
+          sv: matchingTaxon.vernacularName?.sv ? capitalize(matchingTaxon.vernacularName.sv) : null
+        };
+      }
+    }
+    
+    // Try alternative endpoint if the first one fails
+    const altUrl = `https://api.laji.fi/v0/taxa/search?query=${encodeURIComponent(latin)}&access_token=${LAJI_FI_TOKEN}`;
+    console.log(`Trying alternative Laji.fi URL: ${altUrl}`);
+    
+    const altResponse = await axios.get(altUrl);
+    
+    if (altResponse.data && altResponse.data.results && Array.isArray(altResponse.data.results) && altResponse.data.results.length > 0) {
+      const result = altResponse.data.results[0];
       
       return {
-        fi: fiName ? capitalize(fiName) : null,
-        sv: svName ? capitalize(svName) : null
+        fi: result.vernacularName?.fi ? capitalize(result.vernacularName.fi) : null,
+        sv: result.vernacularName?.sv ? capitalize(result.vernacularName.sv) : null
       };
-    } else {
-      console.log(`No results found for ${latin} in laji.fi`);
-      console.log('Response data:', JSON.stringify(searchRes.data, null, 2));
     }
+    
+    console.log(`No results found for ${latin} in laji.fi`);
+    return { fi: null, sv: null };
   } catch (err) {
     console.error(`Laji.fi error for ${latin}:`, err.message);
     if (err.response) {
       console.error('Response status:', err.response.status);
-      console.error('Response data:', err.response.data);
+      console.error('Response data:', JSON.stringify(err.response.data, null, 2));
     }
+    return { fi: null, sv: null };
   }
-  return { fi: null, sv: null };
 }
 
 async function fetchGBIFName(latin) {

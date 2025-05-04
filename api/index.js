@@ -19,9 +19,9 @@ app.get('/api/vernacular', async (req, res) => {
   }
 
   try {
-    console.log(`Processing vernacular name request for: ${latinName}`);
+    console.log(`[Vercel] Processing vernacular name request for: ${latinName}`);
     const formatted = formatLatinName(latinName);
-    console.log(`Formatted Latin name: ${formatted}`);
+    console.log(`[Vercel] Formatted Latin name: ${formatted}`);
 
     // Fetch names from different sources
     const etName = await fetchEstonianWikiName(formatted);
@@ -35,10 +35,10 @@ app.get('/api/vernacular', async (req, res) => {
       en: enName ? capitalize(enName) : ''
     };
 
-    console.log(`Vernacular names for ${formatted}:`, names);
+    console.log(`[Vercel] Vernacular names for ${formatted}:`, names);
     res.json(names);
   } catch (error) {
-    console.error('Error fetching vernacular names:', error);
+    console.error('[Vercel] Error fetching vernacular names:', error);
     res.status(500).json({ error: 'Failed to fetch vernacular names', details: error.message });
   }
 });

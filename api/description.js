@@ -43,10 +43,10 @@ async function fetchMushroomDescription(latinName) {
     
     console.log(`No specific description found for ${latinName}, generating generic one`);
     // If all else fails, return a generic description
-    return `${latinName} is a fascinating fungus found in forest ecosystems. It plays an important role in nutrient cycling and biodiversity.`;
+    return `This fascinating fungus is found in forest ecosystems. It plays an important role in nutrient cycling and biodiversity.`;
   } catch (error) {
     console.error('Error fetching mushroom description:', error);
-    return `${latinName} is a species of fungus that contributes to the rich biodiversity of forest ecosystems.`;
+    return `This species contributes to the rich biodiversity of forest ecosystems.`;
   }
 }
 
