@@ -1,17 +1,21 @@
 const express = require('express');
 const axios = require('axios');
-const cors = require('cors'); // Vajalik CORS probleemide vältimiseks brauseris
+const cors = require('cors');
 const path = require('path');
-const { formatLatinName, capitalize, fetchEstonianWikiName, fetchLajiFiNames, fetchGBIFName } = require('./utils'); // Eeldame, et sinu senine kood on failis utils.js
+const { formatLatinName, capitalize, fetchEstonianWikiName, fetchLajiFiNames, fetchGBIFName } = require('./utils');
 
 const app = express();
 // Use environment variable for port or default to 3000
 const port = process.env.PORT || 3000;
 
-app.use(cors()); // Luba kõik CORS päringud (arenduseks)
-app.use(express.static(path.join(__dirname))); // Serve static files
+app.use(cors());
+app.use(express.static(path.join(__dirname)));
 
-// Loo API lõpp-punkt ladinakeelse nime vastuvõtmiseks
+// Import API routes
+const descriptionRouter = require('./api/description');
+const suggestionsRouter = require('./api/suggestions');
+
+// API endpoint for vernacular names
 app.get('/api/vernacular', async (req, res) => {
   const latinName = req.query.latin;
 
@@ -20,25 +24,33 @@ app.get('/api/vernacular', async (req, res) => {
   }
 
   try {
+    console.log(`Processing vernacular name request for: ${latinName}`);
     const formatted = formatLatinName(latinName);
+    console.log(`Formatted Latin name: ${formatted}`);
+
+    // Fetch names from different sources
+    const etName = await fetchEstonianWikiName(formatted);
+    const lajiFiNames = await fetchLajiFiNames(formatted);
+    const enName = await fetchGBIFName(formatted);
 
     const names = {
-      latinName: formatted, // Return the properly formatted Latin name
-      et: capitalize(await fetchEstonianWikiName(formatted) || ''),
-      ...await fetchLajiFiNames(formatted),
-      en: capitalize(await fetchGBIFName(formatted) || ''),
+      latinName: formatted,
+      et: etName ? capitalize(etName) : '',
+      ...lajiFiNames,
+      en: enName ? capitalize(enName) : ''
     };
 
-    // Capitalize Finnish and Swedish names
-    if (names.fi) names.fi = capitalize(names.fi);
-    if (names.sv) names.sv = capitalize(names.sv);
-
+    console.log(`Vernacular names for ${formatted}:`, names);
     res.json(names);
   } catch (error) {
     console.error('Error fetching vernacular names:', error);
-    res.status(500).json({ error: 'Failed to fetch vernacular names' });
+    res.status(500).json({ error: 'Failed to fetch vernacular names', details: error.message });
   }
 });
+
+// Use API routers
+app.use('/api/description', descriptionRouter);
+app.use('/api/suggestions', suggestionsRouter);
 
 // Serve the main page
 app.get('/', (req, res) => {
@@ -57,7 +69,7 @@ if (process.env.VERCEL) {
 } else {
   // Start the server normally for local development
   app.listen(port, () => {
-    console.log(`Server töötab pordil ${port}`);
+    console.log(`Server running on port ${port}`);
     console.log(`Main page: http://localhost:${port}`);
     console.log(`Instagram text generator: http://localhost:${port}/instagram-text.html`);
   });

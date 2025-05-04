@@ -17,10 +17,12 @@ router.get('/', async (req, res) => {
   try {
     console.log(`Fetching suggestions for query: ${query}`);
     
+    // Construct the URL with proper parameters
+    const url = `https://api.laji.fi/v0/taxa/search?query=${encodeURIComponent(query)}&limit=10&includePayload=false&matchType=partial&onlyFungi=true&access_token=${LAJI_FI_TOKEN}`;
+    console.log(`Laji.fi URL: ${url}`);
+    
     // Fetch suggestions from laji.fi API with the token
-    const response = await axios.get(
-      `https://api.laji.fi/v0/taxa/search?query=${encodeURIComponent(query)}&limit=10&includePayload=false&matchType=partial&onlyFungi=true&access_token=${LAJI_FI_TOKEN}`
-    );
+    const response = await axios.get(url);
     
     console.log('Laji.fi suggestions response status:', response.status);
     
@@ -44,9 +46,11 @@ router.get('/', async (req, res) => {
     res.json(suggestions);
   } catch (error) {
     console.error('Error fetching suggestions:', error.message);
-    console.error('Response status:', error.response?.status);
-    console.error('Response data:', error.response?.data);
-    res.status(500).json({ error: 'Failed to fetch suggestions' });
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
+    res.status(500).json({ error: 'Failed to fetch suggestions', details: error.message });
   }
 });
 

@@ -2,12 +2,13 @@
 const express = require('express');
 const cors = require('cors');
 const { formatLatinName, capitalize, fetchEstonianWikiName, fetchLajiFiNames, fetchGBIFName } = require('../utils');
-const descriptionRouter = require('./description');
-const suggestionsRouter = require('./suggestions');
-const conservationRouter = require('./conservation');
 
 const app = express();
 app.use(cors());
+
+// Import API routes
+const descriptionRouter = require('./description');
+const suggestionsRouter = require('./suggestions');
 
 // API endpoint for vernacular names
 app.get('/api/vernacular', async (req, res) => {
@@ -18,34 +19,33 @@ app.get('/api/vernacular', async (req, res) => {
   }
 
   try {
+    console.log(`Processing vernacular name request for: ${latinName}`);
     const formatted = formatLatinName(latinName);
+    console.log(`Formatted Latin name: ${formatted}`);
+
+    // Fetch names from different sources
+    const etName = await fetchEstonianWikiName(formatted);
+    const lajiFiNames = await fetchLajiFiNames(formatted);
+    const enName = await fetchGBIFName(formatted);
 
     const names = {
-      latinName: formatted, // Return the properly formatted Latin name
-      et: capitalize(await fetchEstonianWikiName(formatted) || ''),
-      ...await fetchLajiFiNames(formatted),
-      en: capitalize(await fetchGBIFName(formatted) || ''),
+      latinName: formatted,
+      et: etName ? capitalize(etName) : '',
+      ...lajiFiNames,
+      en: enName ? capitalize(enName) : ''
     };
 
-    // Capitalize Finnish and Swedish names
-    if (names.fi) names.fi = capitalize(names.fi);
-    if (names.sv) names.sv = capitalize(names.sv);
-
+    console.log(`Vernacular names for ${formatted}:`, names);
     res.json(names);
   } catch (error) {
     console.error('Error fetching vernacular names:', error);
-    res.status(500).json({ error: 'Failed to fetch vernacular names' });
+    res.status(500).json({ error: 'Failed to fetch vernacular names', details: error.message });
   }
 });
 
-// Use description router
+// Use API routers
 app.use('/api/description', descriptionRouter);
-
-// Use suggestions router
 app.use('/api/suggestions', suggestionsRouter);
-
-// Use conservation router
-app.use('/api/conservation', conservationRouter);
 
 // Export the Express app as a serverless function
 module.exports = app;

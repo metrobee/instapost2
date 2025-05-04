@@ -4,10 +4,6 @@ const router = express.Router();
 const axios = require('axios');
 const cheerio = require('cheerio');
 
-// API tokens
-const GBIF_API_TOKEN = ''; // GBIF doesn't require a token for basic usage
-const WIKI_API_TOKEN = ''; // Wikipedia doesn't require a token for basic usage
-
 // API endpoint to get a description for a mushroom
 router.get('/', async (req, res) => {
   const latinName = req.query.name;
@@ -17,6 +13,7 @@ router.get('/', async (req, res) => {
   }
   
   try {
+    console.log(`Generating description for: ${latinName}`);
     const description = await fetchMushroomDescription(latinName);
     res.json({ description });
   } catch (error) {
@@ -28,23 +25,28 @@ router.get('/', async (req, res) => {
 // Function to fetch mushroom description from various web sources
 async function fetchMushroomDescription(latinName) {
   try {
+    console.log(`Trying Wikipedia for ${latinName}`);
     // Try to get description from Wikipedia
     const wikiDescription = await fetchFromWikipedia(latinName);
     if (wikiDescription) {
+      console.log(`Found Wikipedia description for ${latinName}`);
       return wikiDescription;
     }
     
+    console.log(`Trying GBIF for ${latinName}`);
     // Try to get description from GBIF
     const gbifDescription = await fetchFromGBIF(latinName);
     if (gbifDescription) {
+      console.log(`Found GBIF description for ${latinName}`);
       return gbifDescription;
     }
     
+    console.log(`No specific description found for ${latinName}, generating generic one`);
     // If all else fails, return a generic description
-    return generateGenericDescription(latinName);
+    return `${latinName} is a fascinating fungus found in forest ecosystems. It plays an important role in nutrient cycling and biodiversity.`;
   } catch (error) {
     console.error('Error fetching mushroom description:', error);
-    return generateGenericDescription(latinName);
+    return `${latinName} is a species of fungus that contributes to the rich biodiversity of forest ecosystems.`;
   }
 }
 
@@ -54,7 +56,7 @@ async function fetchFromWikipedia(latinName) {
     // Wikipedia API doesn't require authentication for basic usage
     const response = await axios.get(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(latinName)}`, {
       headers: {
-        'User-Agent': 'VernacularWebApp/1.0 (https://github.com/yourusername/vernacular-web; your-email@example.com)'
+        'User-Agent': 'VernacularWebApp/1.0'
       }
     });
     
@@ -117,25 +119,6 @@ async function fetchFromGBIF(latinName) {
     console.error('GBIF error:', error.message);
     return null;
   }
-}
-
-// Generate a generic description based on the Latin name
-function generateGenericDescription(latinName) {
-  const genus = latinName.split(' ')[0];
-  const species = latinName.split(' ')[1] || '';
-  
-  // Use the species name to deterministically select a template
-  const templates = [
-    `${latinName} is a fascinating fungus found in forest ecosystems. Like other members of the ${genus} genus, it plays an important role in nutrient cycling and biodiversity.`,
-    `This species (${latinName}) is part of the ${genus} genus, known for its distinctive characteristics and ecological importance in woodland habitats.`,
-    `${latinName} is an interesting mushroom species that showcases the incredible diversity of fungi in our forests. It contributes to the complex web of relationships in forest ecosystems.`,
-    `Found in its natural habitat, ${latinName} is a representative of the ${genus} genus, which includes various species with unique ecological adaptations.`,
-    `This beautiful specimen of ${latinName} demonstrates the important role fungi play in forest ecosystems, forming relationships with trees and other organisms.`
-  ];
-  
-  // Select a template based on the species name length to ensure consistency
-  const index = species.length % templates.length;
-  return templates[index];
 }
 
 module.exports = router;
