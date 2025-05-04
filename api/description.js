@@ -4,6 +4,10 @@ const router = express.Router();
 const axios = require('axios');
 const cheerio = require('cheerio');
 
+// API tokens
+const GBIF_API_TOKEN = ''; // GBIF doesn't require a token for basic usage
+const WIKI_API_TOKEN = ''; // Wikipedia doesn't require a token for basic usage
+
 // API endpoint to get a description for a mushroom
 router.get('/', async (req, res) => {
   const latinName = req.query.name;
@@ -47,7 +51,12 @@ async function fetchMushroomDescription(latinName) {
 // Fetch description from Wikipedia
 async function fetchFromWikipedia(latinName) {
   try {
-    const response = await axios.get(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(latinName)}`);
+    // Wikipedia API doesn't require authentication for basic usage
+    const response = await axios.get(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(latinName)}`, {
+      headers: {
+        'User-Agent': 'VernacularWebApp/1.0 (https://github.com/yourusername/vernacular-web; your-email@example.com)'
+      }
+    });
     
     if (response.data && response.data.extract) {
       // Clean up and limit the description

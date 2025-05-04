@@ -2,11 +2,21 @@
 
 const axios = require('axios');
 
+// API tokens
+const WIKI_API_TOKEN = ''; // Wikipedia doesn't require a token for basic usage
+const LAJI_FI_TOKEN = '7QLHuUdYIx9MNIlnUVgYxND3mSzXGGXRNsscKazTuGgFjcCIlKxMJJHdvy1J6Z4o';
+const GBIF_API_TOKEN = ''; // GBIF doesn't require a token for basic usage
+
 function formatLatinName(input) {
-  const [genus, species] = input.trim().split(" ");
-  return `${capitalize(genus)} ${species.toLowerCase()}`;
+  if (!input || !input.includes(" ")) {
+    return capitalize(input || '');
+  }
+  const [genus, ...speciesParts] = input.trim().split(" ");
+  return `${capitalize(genus)} ${speciesParts.join(' ').toLowerCase()}`;
 }
+
 function capitalize(str) {
+  if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
@@ -22,6 +32,9 @@ async function fetchEstonianWikiName(latin) {
         rvlimit: 1,
         rvsection: 0,
         origin: '*'
+      },
+      headers: {
+        'User-Agent': 'VernacularWebApp/1.0 (https://github.com/yourusername/vernacular-web; your-email@example.com)'
       }
     });
     const pages = wiki.data?.query?.pages;
@@ -54,7 +67,7 @@ async function fetchEstonianWikiName(latin) {
 async function fetchLajiFiNames(latin) {
   try {
     const searchRes = await axios.get(
-      `https://laji.fi/api/taxa/search?query=${encodeURIComponent(latin)}&limit=1`
+      `https://api.laji.fi/v0/taxa/search?query=${encodeURIComponent(latin)}&limit=1&access_token=${LAJI_FI_TOKEN}`
     );
 
     if (searchRes.data?.results && Array.isArray(searchRes.data.results) && searchRes.data.results.length > 0) {

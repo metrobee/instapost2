@@ -4,6 +4,7 @@ const cors = require('cors');
 const { formatLatinName, capitalize, fetchEstonianWikiName, fetchLajiFiNames, fetchGBIFName } = require('../utils');
 const descriptionRouter = require('./description');
 const suggestionsRouter = require('./suggestions');
+const conservationRouter = require('./conservation');
 
 const app = express();
 app.use(cors());
@@ -42,6 +43,9 @@ app.use('/api/description', descriptionRouter);
 
 // Use suggestions router
 app.use('/api/suggestions', suggestionsRouter);
+
+// Use conservation router
+app.use('/api/conservation', conservationRouter);
 
 // Export the Express app as a serverless function
 module.exports = app;
