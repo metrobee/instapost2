@@ -47,5 +47,8 @@ app.get('/api/vernacular', async (req, res) => {
 app.use('/api/description', descriptionRouter);
 app.use('/api/suggestions', suggestionsRouter);
 
+// Serve static files for Vercel
+app.use(express.static('.'));
+
 // Export the Express app as a serverless function
 module.exports = app;
